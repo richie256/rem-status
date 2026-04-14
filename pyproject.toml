@@ -2,7 +2,6 @@
 name = "rem-status-mqtt"
 version = "0.1.0"
 description = "A scraper for REM Montreal service status that publishes to MQTT."
-authors = [{ name = "Gemini CLI", email = "gemini-cli@google.com" }]
 dependencies = [
     "httpx",
     "beautifulsoup4",
