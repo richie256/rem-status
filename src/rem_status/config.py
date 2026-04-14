@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     mqtt_username: Optional[str] = None
     mqtt_password: Optional[str] = None
     mqtt_discovery_prefix: str = "homeassistant"
-    mqtt_base_topic: str = "rem_status"
+    mqtt_base_topic: str = "home/transit/rem"
 
     direction: str = "Entre Brossard et Bois-Franc"
     language: str = "fr"

@@ -39,7 +39,7 @@ class MqttClient:
             "identifiers": ["rem_status_scraper"],
             "name": "REM Status Scraper",
             "model": "REM Status",
-            "manufacturer": "Gemini CLI Scraper",
+            "manufacturer": "REM",
         }
 
         sensors = [
