@@ -28,6 +28,7 @@ rem-status-mqtt = "rem_status.main:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+pythonpath = ["src"]
 
 [tool.ruff]
 line-length = 120

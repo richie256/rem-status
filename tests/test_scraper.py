@@ -47,8 +47,9 @@ async def test_holiday_detection(settings):
     scraper = RemScraper(settings)
     
     # Mock date to April 13
-    with patch("rem_status.scraper.datetime") as mock_date:
-        mock_date.now.return_value = datetime(2026, 4, 13)
+    with patch("rem_status.scraper.datetime") as mock_datetime:
+        mock_datetime.now.return_value = datetime(2026, 4, 13)
+        mock_datetime.side_effect = lambda *args, **kw: datetime(*args, **kw)
         
         mock_html = """
         <html>

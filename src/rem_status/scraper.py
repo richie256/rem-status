@@ -1,4 +1,5 @@
 import httpx
+from datetime import datetime
 from bs4 import BeautifulSoup
 from loguru import logger
 from typing import Optional
@@ -35,7 +36,6 @@ class RemScraper:
             return None
 
     def _is_today_holiday(self, soup: BeautifulSoup) -> bool:
-        from datetime import datetime
         now = datetime.now()
         
         # Months in French and English
