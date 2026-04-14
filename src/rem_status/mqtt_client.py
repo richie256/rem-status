@@ -4,13 +4,14 @@ from loguru import logger
 from .config import Settings
 from .models import RemStatus
 
+
 class MqttClient:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
         if settings.mqtt_username and settings.mqtt_password:
             self.client.username_pw_set(settings.mqtt_username, settings.mqtt_password)
-        
+
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
 

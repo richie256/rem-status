@@ -5,6 +5,7 @@ from .config import Settings
 from .scraper import RemScraper
 from .mqtt_client import MqttClient
 
+
 async def main():
     settings = Settings()
     scraper = RemScraper(settings)
@@ -32,7 +33,7 @@ async def main():
             if status:
                 mqtt.publish_state(status)
                 is_holiday = status.is_holiday
-            
+
             interval = settings.get_poll_interval(is_holiday)
             logger.debug(f"Sleeping for {interval} seconds...")
             try:
@@ -48,6 +49,7 @@ async def main():
         mqtt.disconnect()
         await scraper.close()
         logger.info("Application stopped.")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

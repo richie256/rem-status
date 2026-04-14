@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
@@ -24,9 +25,10 @@ class Settings(BaseSettings):
 
     def get_poll_interval(self, is_holiday: bool = False) -> int:
         from datetime import datetime, time
+
         now_dt = datetime.now()
         now = now_dt.time()
-        
+
         # Sundays are treated like holidays in terms of frequency
         is_sunday = now_dt.weekday() == 6
         if is_holiday or is_sunday:
@@ -37,8 +39,9 @@ class Settings(BaseSettings):
             end = time.fromisoformat(end_str)
             return start <= now <= end
 
-        if is_between(self.peak_morning_start, self.peak_morning_end) or \
-           is_between(self.peak_afternoon_start, self.peak_afternoon_end):
+        if is_between(self.peak_morning_start, self.peak_morning_end) or is_between(
+            self.peak_afternoon_start, self.peak_afternoon_end
+        ):
             return self.poll_interval_peak
         return self.poll_interval_off_peak
 
