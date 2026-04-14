@@ -1,0 +1,20 @@
+[project]
+name = "rem-status-mqtt"
+version = "0.1.0"
+description = "A scraper for REM Montreal service status that publishes to MQTT."
+authors = [{ name = "Gemini CLI", email = "gemini-cli@google.com" }]
+dependencies = [
+    "httpx",
+    "beautifulsoup4",
+    "paho-mqtt",
+    "pydantic-settings",
+    "loguru",
+]
+requires-python = ">=3.10"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project.scripts]
+rem-status-mqtt = "rem_status.main:main"
