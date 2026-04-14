@@ -1,5 +1,5 @@
 [project]
-name = "rem-status-mqtt"
+name = "rem-status"
 version = "0.1.0"
 description = "A scraper for REM Montreal service status that publishes to MQTT."
 dependencies = [
@@ -23,7 +23,7 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-rem-status-mqtt = "rem_status.main:main"
+rem-status = "rem_status.main:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

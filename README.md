@@ -1,5 +1,7 @@
 # REM Status MQTT Scraper
 
+![CI/CD](https://github.com/richie256/rem-status/actions/workflows/ci.yml/badge.svg)
+
 This Python project scrapes the official REM Montreal website for service status, frequencies, and alerts, then publishes the data to an MQTT broker. It supports Home Assistant MQTT Discovery for easy integration.
 
 ## Features
@@ -44,11 +46,34 @@ cp .env.example .env
 
 Run the scraper:
 ```bash
-rem-status-mqtt
+rem-status
 ```
 Or run as a module:
 ```bash
-python -m src.rem_status.main
+python -m rem_status.main
+```
+
+## Docker
+
+You can run this application using the pre-built image from the GitHub Container Registry.
+
+1. Run the container:
+   ```bash
+   docker run -d \
+     --name rem-status \
+     -e MQTT_HOST=your_mqtt_host \
+     -e MQTT_PORT=1883 \
+     -e DIRECTION="Entre Brossard et Bois-Franc" \
+     -e LANGUAGE=fr \
+     -e POLL_INTERVAL_PEAK=600 \
+     -e POLL_INTERVAL_OFF_PEAK=1800 \
+     ghcr.io/richie256/rem-status:latest
+   ```
+
+Alternatively, to build the image locally:
+```bash
+docker build -t rem-status .
+docker run -d --name rem-status --env-file .env rem-status
 ```
 
 ## Data Scraped

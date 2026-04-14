@@ -16,4 +16,4 @@ COPY src/ src/
 RUN pip install --no-cache-dir .
 
 # Command to run the application
-CMD ["rem-status-mqtt"]
+CMD ["rem-status"]
