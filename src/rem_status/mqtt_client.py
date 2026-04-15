@@ -50,7 +50,10 @@ class MqttClient:
         ]
 
         for sensor in sensors:
-            discovery_topic = f"{prefix}/sensor/{base_topic}/{sensor['id']}/config"
+            # Standard HA Discovery: <prefix>/<component>/<node_id>/<object_id>/config
+            # node_id: rem_status
+            # object_id: <sensor_id>
+            discovery_topic = f"{prefix}/sensor/rem_status/{sensor['id']}/config"
             payload = {
                 "name": f"REM {sensor['name']}",
                 "state_topic": f"{base_topic}/state",
