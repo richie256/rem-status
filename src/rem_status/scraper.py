@@ -1,4 +1,7 @@
 import httpx
+import json
+import time
+import os
 from datetime import datetime
 from bs4 import BeautifulSoup
 from loguru import logger
@@ -6,11 +9,32 @@ from typing import Optional
 from .models import RemStatus
 from .config import Settings
 
+CACHE_FILE = "frequency_cache.json"
+CACHE_EXPIRY = 48 * 3600  # 48 hours
+
 
 class RemScraper:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.client = httpx.AsyncClient(timeout=10.0)
+
+    def _get_cached_frequencies(self) -> Optional[dict]:
+        if os.path.exists(CACHE_FILE):
+            try:
+                with open(CACHE_FILE, "r") as f:
+                    cache = json.load(f)
+                    if time.time() - cache["timestamp"] < CACHE_EXPIRY:
+                        return cache["data"]
+            except Exception as e:
+                logger.error(f"Error reading cache: {e}")
+        return None
+
+    def _save_cached_frequencies(self, peak: str, off_peak: str):
+        try:
+            with open(CACHE_FILE, "w") as f:
+                json.dump({"timestamp": time.time(), "data": {"peak": peak, "off_peak": off_peak}}, f)
+        except Exception as e:
+            logger.error(f"Error saving cache: {e}")
 
     async def fetch_status(self) -> Optional[RemStatus]:
         try:
@@ -19,7 +43,17 @@ class RemScraper:
             soup = BeautifulSoup(response.text, "html.parser")
 
             status = self._parse_status(soup)
-            peak, off_peak = self._parse_frequencies(soup)
+
+            cached = self._get_cached_frequencies()
+            if cached:
+                peak, off_peak = cached["peak"], cached["off_peak"]
+                logger.debug("Using cached frequency data.")
+            else:
+                peak, off_peak = self._parse_frequencies(soup)
+                if peak and off_peak:
+                    self._save_cached_frequencies(peak, off_peak)
+                    logger.debug("Cached new frequency data.")
+
             alert = self._parse_alert(soup)
             is_holiday = self._is_today_holiday(soup)
 
