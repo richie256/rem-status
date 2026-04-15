@@ -9,8 +9,8 @@ from typing import Optional
 from .models import RemStatus
 from .config import Settings
 
-CACHE_FILE = "frequency_cache.json"
-CACHE_EXPIRY = 48 * 3600  # 48 hours
+CACHE_FILE = "rem_cache.json"
+CACHE_EXPIRY = 48 * 3600  # 48 hours for frequency
 
 
 class RemScraper:
@@ -18,50 +18,57 @@ class RemScraper:
         self.settings = settings
         self.client = httpx.AsyncClient(timeout=10.0)
 
-    def _get_cached_frequencies(self) -> Optional[dict]:
+    def _get_cache(self) -> dict:
         if os.path.exists(CACHE_FILE):
             try:
                 with open(CACHE_FILE, "r") as f:
-                    cache = json.load(f)
-                    if time.time() - cache["timestamp"] < CACHE_EXPIRY:
-                        return cache["data"]
+                    return json.load(f)
             except Exception as e:
                 logger.error(f"Error reading cache: {e}")
-        return None
+        return {"timestamp": 0, "frequency": None, "holiday_date": None, "is_holiday": False}
 
-    def _save_cached_frequencies(self, peak: str, off_peak: str):
+    def _save_cache(self, cache: dict):
         try:
             with open(CACHE_FILE, "w") as f:
-                json.dump({"timestamp": time.time(), "data": {"peak": peak, "off_peak": off_peak}}, f)
+                json.dump(cache, f)
         except Exception as e:
             logger.error(f"Error saving cache: {e}")
 
     async def fetch_status(self) -> Optional[RemStatus]:
         try:
-            # 1. Fetch status (always needed)
+            # 1. Fetch status (always needed for alerts/status)
             status_resp = await self.client.get(self.settings.status_url)
             status_resp.raise_for_status()
             status_soup = BeautifulSoup(status_resp.text, "html.parser")
             status = self._parse_status(status_soup)
 
-            # 2. Handle frequency (cached or fetch if missing/expired)
-            cached = self._get_cached_frequencies()
-            if cached:
-                peak, off_peak = cached["peak"], cached["off_peak"]
-                logger.debug("Using cached frequency data.")
+            # 2. Manage cache
+            cache = self._get_cache()
+            now = datetime.now()
+            today_str = now.strftime("%Y-%m-%d")
+
+            # 3. Handle frequency
+            if cache["frequency"] and (time.time() - cache["timestamp"] < CACHE_EXPIRY):
+                peak, off_peak = cache["frequency"]["peak"], cache["frequency"]["off_peak"]
             else:
-                logger.debug("Cache miss/expired. Fetching frequency data from schedule page.")
                 sched_resp = await self.client.get(self.settings.schedule_url)
                 sched_resp.raise_for_status()
                 sched_soup = BeautifulSoup(sched_resp.text, "html.parser")
                 peak, off_peak = self._parse_frequencies(sched_soup)
-                if peak and off_peak:
-                    self._save_cached_frequencies(peak, off_peak)
-                    logger.debug("Cached new frequency data.")
+                cache["timestamp"] = time.time()
+                cache["frequency"] = {"peak": peak, "off_peak": off_peak}
 
-            # 3. Extract remaining info
+            # 4. Handle holiday
+            if cache["holiday_date"] == today_str:
+                is_holiday = cache["is_holiday"]
+            else:
+                is_holiday = self._is_today_holiday(status_soup)
+                cache["holiday_date"] = today_str
+                cache["is_holiday"] = is_holiday
+
+            self._save_cache(cache)
+
             alert = self._parse_alert(status_soup)
-            is_holiday = self._is_today_holiday(status_soup)
 
             return RemStatus(
                 status=status,
