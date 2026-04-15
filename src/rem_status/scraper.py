@@ -117,11 +117,11 @@ class RemScraper:
             text = h6.get_text(strip=True).lower()
             if "min" in text:
                 frequencies.append(h6.get_text(strip=True))
-        
+
         if len(frequencies) >= 2:
             peak = frequencies[0]
             off_peak = frequencies[1]
-        
+
         return peak, off_peak
 
     def _parse_alert(self, soup: BeautifulSoup) -> Optional[str]:
