@@ -17,20 +17,11 @@ async def test_fetch_status_mock(settings):
     <html>
         <body>
             <div class="service-status-banner">Normal</div>
-            <div class="service-frequencies">
-                <div class="frequency-item">
-                    <span class="label">Heures de pointe</span>
-                    <span class="value">3 min 30 s</span>
-                </div>
-                <div class="frequency-item">
-                    <span class="label">Heures hors pointe</span>
-                    <span class="value">7 min</span>
-                </div>
-            </div>
+            <h6>3 min 30 s</h6>
+            <h6>7 min</h6>
         </body>
     </html>
     """
-
     with patch("httpx.AsyncClient.get") as mock_get:
         mock_get.return_value = AsyncMock(status_code=200, text=mock_html)
         mock_get.return_value.raise_for_status = lambda: None

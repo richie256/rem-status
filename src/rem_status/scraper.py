@@ -106,26 +106,22 @@ class RemScraper:
         peak = None
         off_peak = None
 
-        freq_section = soup.select_one(".service-frequencies")
-        if freq_section:
-            items = freq_section.select(".frequency-item")
-            for item in items:
-                label = item.select_one(".label")
-                value = item.select_one(".value")
-                if label and value:
-                    text_label = label.get_text().lower()
-                    # French: "Heures de pointe", "Heures hors pointe"
-                    # English: "Peak hours", "Off-peak hours"
-                    is_peak = ("pointe" in text_label and "hors" not in text_label) or (
-                        "peak" in text_label and "off" not in text_label
-                    )
-                    is_off_peak = "hors" in text_label or "off" in text_label
-
-                    if is_peak:
-                        peak = value.get_text(strip=True)
-                    elif is_off_peak:
-                        off_peak = value.get_text(strip=True)
-
+        # Look for frequency values
+        # The structure found is: <h6>Frequency value</h6>
+        # We need to adapt the logic to find these h6 values.
+        # Since the structure is quite simple, we can select all h6 and find the ones that match frequency patterns.
+        h6_elements = soup.select("h6")
+        logger.debug(f"Found {len(h6_elements)} h6 elements: {[h.get_text(strip=True) for h in h6_elements]}")
+        frequencies = []
+        for h6 in h6_elements:
+            text = h6.get_text(strip=True).lower()
+            if "min" in text:
+                frequencies.append(h6.get_text(strip=True))
+        
+        if len(frequencies) >= 2:
+            peak = frequencies[0]
+            off_peak = frequencies[1]
+        
         return peak, off_peak
 
     def _parse_alert(self, soup: BeautifulSoup) -> Optional[str]:
