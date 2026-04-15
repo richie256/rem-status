@@ -38,24 +38,30 @@ class RemScraper:
 
     async def fetch_status(self) -> Optional[RemStatus]:
         try:
-            response = await self.client.get(self.settings.url)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, "html.parser")
+            # Fetch status
+            status_resp = await self.client.get(self.settings.status_url)
+            status_resp.raise_for_status()
+            status_soup = BeautifulSoup(status_resp.text, "html.parser")
 
-            status = self._parse_status(soup)
+            # Fetch frequencies
+            sched_resp = await self.client.get(self.settings.schedule_url)
+            sched_resp.raise_for_status()
+            sched_soup = BeautifulSoup(sched_resp.text, "html.parser")
+
+            status = self._parse_status(status_soup)
 
             cached = self._get_cached_frequencies()
             if cached:
                 peak, off_peak = cached["peak"], cached["off_peak"]
                 logger.debug("Using cached frequency data.")
             else:
-                peak, off_peak = self._parse_frequencies(soup)
+                peak, off_peak = self._parse_frequencies(sched_soup)
                 if peak and off_peak:
                     self._save_cached_frequencies(peak, off_peak)
                     logger.debug("Cached new frequency data.")
 
-            alert = self._parse_alert(soup)
-            is_holiday = self._is_today_holiday(soup)
+            alert = self._parse_alert(status_soup)
+            is_holiday = self._is_today_holiday(status_soup)
 
             return RemStatus(
                 status=status,

@@ -46,7 +46,13 @@ class Settings(BaseSettings):
         return self.poll_interval_off_peak
 
     @property
-    def url(self) -> str:
+    def status_url(self) -> str:
+        if self.language.lower() == "en":
+            return "https://rem.info/en/travelling/network-status"
+        return "https://rem.info/fr/se-deplacer/etat-du-service"
+
+    @property
+    def schedule_url(self) -> str:
         if self.language.lower() == "en":
             return "https://rem.info/en/se-deplacer/horaire-de-service"
         return "https://rem.info/fr/se-deplacer/horaire-de-service"
