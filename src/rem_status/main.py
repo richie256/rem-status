@@ -23,6 +23,10 @@ async def main():
         loop.add_signal_handler(sig, handle_signal)
 
     logger.info("Starting REM status scraper...")
+    
+    refresh_event = asyncio.Event()
+    mqtt.on_refresh_requested = lambda: loop.call_soon_threadsafe(refresh_event.set)
+    
     mqtt.connect()
 
     try:
@@ -36,12 +40,24 @@ async def main():
 
             interval = settings.get_poll_interval(is_holiday)
             logger.debug(f"Sleeping for {interval} seconds...")
+            
+            refresh_event.clear()
+            
+            # Wait for poll interval, stop signal, or refresh request
+            wait_tasks = [
+                asyncio.create_task(stop_event.wait()),
+                asyncio.create_task(refresh_event.wait()),
+            ]
             try:
-                # Wait for poll interval or stop signal
-                await asyncio.wait_for(stop_event.wait(), timeout=interval)
-            except asyncio.TimeoutError:
-                # Normal case: continue loop
-                pass
+                await asyncio.wait(
+                    wait_tasks,
+                    timeout=interval,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+            finally:
+                for task in wait_tasks:
+                    if not task.done():
+                        task.cancel()
     except Exception as e:
         logger.error(f"Unexpected error in main loop: {e}")
     finally:

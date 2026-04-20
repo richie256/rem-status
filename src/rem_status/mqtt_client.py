@@ -1,6 +1,9 @@
 import json
+from typing import Callable, Optional
+
 import paho.mqtt.client as mqtt
 from loguru import logger
+
 from .config import Settings
 from .models import RemStatus
 
@@ -8,22 +11,38 @@ from .models import RemStatus
 class MqttClient:
     def __init__(self, settings: Settings):
         self.settings = settings
+        self.on_refresh_requested: Optional[Callable[[], None]] = None
         self.client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
         if settings.mqtt_username and settings.mqtt_password:
             self.client.username_pw_set(settings.mqtt_username, settings.mqtt_password)
 
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
+        self.client.on_message = self._on_message
 
     def _on_connect(self, client, userdata, flags, rc, properties=None):
         if rc == 0:
             logger.info("Connected to MQTT broker")
             self._publish_discovery()
+            
+            # Subscribe to Home Assistant status for birth messages
+            status_topic = f"{self.settings.mqtt_discovery_prefix}/status"
+            self.client.subscribe(status_topic)
+            logger.info(f"Subscribed to {status_topic}")
         else:
             logger.error(f"Failed to connect to MQTT broker with code {rc}")
 
     def _on_disconnect(self, client, userdata, rc, properties=None, reason_code=None):
         logger.warning(f"Disconnected from MQTT broker with code {rc}")
+
+    def _on_message(self, client, userdata, msg):
+        status_topic = f"{self.settings.mqtt_discovery_prefix}/status"
+        if msg.topic == status_topic:
+            payload = msg.payload.decode()
+            logger.info(f"Received HA status message: {payload}")
+            if payload == "online" and self.on_refresh_requested:
+                logger.info("Home Assistant is online, triggering refresh")
+                self.on_refresh_requested()
 
     def connect(self):
         try:
