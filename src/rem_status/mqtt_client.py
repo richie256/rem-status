@@ -24,7 +24,7 @@ class MqttClient:
         if rc == 0:
             logger.info("Connected to MQTT broker")
             self._publish_discovery()
-            
+
             # Subscribe to Home Assistant status for birth messages
             status_topic = f"{self.settings.mqtt_discovery_prefix}/status"
             self.client.subscribe(status_topic)
