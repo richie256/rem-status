@@ -1,9 +1,11 @@
 import asyncio
 import signal
+
 from loguru import logger
+
 from .config import Settings
-from .scraper import RemScraper
 from .mqtt_client import MqttClient
+from .scraper import RemScraper
 
 
 async def main():

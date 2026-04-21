@@ -1,7 +1,9 @@
-import pytest
-from rem_status.scraper import RemScraper
-from rem_status.config import Settings
 from unittest.mock import AsyncMock, patch
+
+import pytest
+
+from rem_status.config import Settings
+from rem_status.scraper import RemScraper
 
 
 @pytest.fixture

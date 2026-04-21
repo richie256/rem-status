@@ -1,13 +1,15 @@
-import httpx
 import json
-import time
 import os
+import time
 from datetime import datetime
+from typing import Optional
+
+import httpx
 from bs4 import BeautifulSoup
 from loguru import logger
-from typing import Optional
-from .models import RemStatus
+
 from .config import Settings
+from .models import RemStatus
 
 CACHE_FILE = "rem_cache.json"
 CACHE_EXPIRY = 48 * 3600  # 48 hours for frequency
