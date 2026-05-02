@@ -14,6 +14,28 @@ from .models import RemStatus
 CACHE_FILE = "rem_cache.json"
 CACHE_EXPIRY = 48 * 3600  # 48 hours for frequency
 
+STATIONS = [
+    "Brossard",
+    "Du Quartier",
+    "Panama",
+    "Île-des-Sœurs",
+    "Gare Centrale",
+    "McGill",
+    "Édouard-Montpetit",
+    "Canora",
+    "Ville-de-Mont-Royal",
+    "Côte-de-Liesse",
+    "Montpellier",
+    "Du Ruisseau",
+    "Bois-Franc",
+    "Sunnybrooke",
+    "Pierrefonds-Roxboro",
+    "Île-Bigras",
+    "Sainte-Dorothée",
+    "Grand-Moulin",
+    "Deux-Montagnes",
+]
+
 
 class RemScraper:
     def __init__(self, settings: Settings):
@@ -72,11 +94,15 @@ class RemScraper:
 
             alert = self._parse_alert(status_soup)
 
+            is_outage, monitored_status = self._check_outage(status, alert)
+
             return RemStatus(
                 status=status,
                 frequency_peak=peak,
                 frequency_off_peak=off_peak,
                 alert=alert,
+                monitored_status=monitored_status,
+                is_outage=is_outage,
                 direction=self.settings.direction,
                 language=self.settings.language,
                 is_holiday=is_holiday,
@@ -84,6 +110,60 @@ class RemScraper:
         except Exception as e:
             logger.error(f"Error fetching REM status: {e}")
             return None
+
+    def _check_outage(self, status: str, alert: Optional[str]) -> tuple[bool, str]:
+        # Normal status strings
+        normal_strings = ["normal", "service normal", "normal - service"]
+
+        is_global_normal = status.lower() in normal_strings and (not alert or alert.lower() in normal_strings)
+
+        if is_global_normal:
+            return False, "Normal"
+
+        # If we have an issue, check if it's in the monitored range
+        from_st = self.settings.monitor_station_from
+        to_st = self.settings.monitor_station_to
+
+        if not from_st or not to_st:
+            # Report any outage
+            return True, alert or status
+
+        # Determine stations in range
+        try:
+            stations_lower = [s.lower() for s in STATIONS]
+            idx_from = stations_lower.index(from_st.lower())
+            idx_to = stations_lower.index(to_st.lower())
+
+            start = min(idx_from, idx_to)
+            end = max(idx_from, idx_to)
+            monitored_range = STATIONS[start : end + 1]
+            monitored_range_lower = [s.lower() for s in monitored_range]
+        except ValueError:
+            # If stations not found, fallback to reporting any outage but log it
+            logger.warning(f"Station {from_st} or {to_st} not found in station list.")
+            return True, alert or status
+
+        # Check if alert or status mentions any station in range
+        full_text = f"{status} {alert or ''}".lower()
+
+        # If the alert mentions "all stations" or "network wide"
+        network_wide_keywords = [
+            "réseau",
+            "network",
+            "toutes les stations",
+            "all stations",
+            "complete network",
+            "ensemble du réseau",
+        ]
+        if any(kw in full_text for kw in network_wide_keywords):
+            return True, alert or status
+
+        for st in monitored_range_lower:
+            if st in full_text:
+                return True, alert or status
+
+        # If it's an outage but not in our range
+        return False, "Normal (Outage elsewhere)"
 
     def _is_today_holiday(self, soup: BeautifulSoup) -> bool:
         now = datetime.now()

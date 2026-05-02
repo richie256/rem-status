@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     poll_interval_peak: int = 600  # 10 minutes
     poll_interval_off_peak: int = 1800  # 300 minutes (Wait, user said 30 mins) -> 1800s
 
+    monitor_station_from: Optional[str] = None
+    monitor_station_to: Optional[str] = None
+
     # Peak hours: 6:30-9:30 and 15:30-18:30 (typical REM peak)
     peak_morning_start: str = "06:30"
     peak_morning_end: str = "09:30"

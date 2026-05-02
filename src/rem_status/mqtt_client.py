@@ -66,12 +66,10 @@ class MqttClient:
             {"name": "Frequency Peak", "id": "frequency_peak", "icon": "mdi:clock-fast"},
             {"name": "Frequency Off-Peak", "id": "frequency_off_peak", "icon": "mdi:clock-slow"},
             {"name": "Alert", "id": "alert", "icon": "mdi:alert-circle"},
+            {"name": "Monitored Status", "id": "monitored_status", "icon": "mdi:map-marker-path"},
         ]
 
         for sensor in sensors:
-            # Standard HA Discovery: <prefix>/<component>/<node_id>/<object_id>/config
-            # node_id: rem_status
-            # object_id: <sensor_id>
             discovery_topic = f"{prefix}/sensor/rem_status/{sensor['id']}/config"
             payload = {
                 "name": f"REM {sensor['name']}",
@@ -79,6 +77,24 @@ class MqttClient:
                 "value_template": f"{{{{ value_json.{sensor['id']} }}}}",
                 "unique_id": f"rem_{sensor['id']}",
                 "device": device,
+                "icon": sensor["icon"],
+            }
+            self.client.publish(discovery_topic, json.dumps(payload), retain=True)
+            logger.debug(f"Published discovery for {sensor['name']}")
+
+        binary_sensors = [
+            {"name": "Outage", "id": "is_outage", "device_class": "problem", "icon": "mdi:alert"},
+        ]
+
+        for sensor in binary_sensors:
+            discovery_topic = f"{prefix}/binary_sensor/rem_status/{sensor['id']}/config"
+            payload = {
+                "name": f"REM {sensor['name']}",
+                "state_topic": f"{base_topic}/state",
+                "value_template": f"{{{{ 'ON' if value_json.{sensor['id']} else 'OFF' }}}}",
+                "unique_id": f"rem_{sensor['id']}",
+                "device": device,
+                "device_class": sensor["device_class"],
                 "icon": sensor["icon"],
             }
             self.client.publish(discovery_topic, json.dumps(payload), retain=True)
