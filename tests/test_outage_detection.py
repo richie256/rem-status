@@ -20,8 +20,13 @@ async def test_outage_within_range(scraper):
     mock_html = """
     <html>
         <body>
-            <div class="service-status-banner">Interruption between Panama and Gare Centrale</div>
-            <div class="alert-message">Technical issues at Île-des-Sœurs</div>
+            <a data-tab="tab-service" class="live-network-status__tab-link">
+                <span aria-label="disrupted service"></span>
+            </a>
+            <div id="tab-service">
+                <div class="alert-message">Technical issues at Île-des-Sœurs</div>
+            </div>
+            <div id="tab-interruption"></div>
             <h6>3 min</h6>
             <h6>7 min</h6>
         </body>
@@ -45,8 +50,13 @@ async def test_outage_outside_range(scraper):
     mock_html = """
     <html>
         <body>
-            <div class="service-status-banner">Interruption at Brossard</div>
-            <div class="alert-message">Power failure at Brossard station</div>
+            <a data-tab="tab-service" class="live-network-status__tab-link">
+                <span aria-label="disrupted service"></span>
+            </a>
+            <div id="tab-service">
+                <div class="alert-message">Power failure at Brossard station</div>
+            </div>
+            <div id="tab-interruption"></div>
             <h6>3 min</h6>
             <h6>7 min</h6>
         </body>
@@ -69,7 +79,13 @@ async def test_network_wide_outage(scraper):
     mock_html = """
     <html>
         <body>
-            <div class="service-status-banner">Network wide interruption</div>
+            <a data-tab="tab-service" class="live-network-status__tab-link">
+                <span aria-label="disrupted service"></span>
+            </a>
+            <div id="tab-service">
+                <div class="alert-message">Network wide interruption</div>
+            </div>
+            <div id="tab-interruption"></div>
             <h6>-</h6>
             <h6>-</h6>
         </body>
@@ -96,7 +112,13 @@ async def test_no_stations_specified(tmp_path):
     mock_html = """
     <html>
         <body>
-            <div class="service-status-banner">Interruption at Brossard</div>
+            <a data-tab="tab-service" class="live-network-status__tab-link">
+                <span aria-label="disrupted service"></span>
+            </a>
+            <div id="tab-service">
+                <div class="alert-message">Interruption at Brossard</div>
+            </div>
+            <div id="tab-interruption"></div>
             <h6>-</h6>
             <h6>-</h6>
         </body>
@@ -116,13 +138,18 @@ async def test_no_stations_specified(tmp_path):
 
 @pytest.mark.asyncio
 async def test_map_based_detection(scraper):
-    # Panama is in range. Simulate it being out-service on the map.
+    # Panama is in range. Global status is normal but map shows Panama as disrupted.
+    # The span has no in-service/out-of-service/elevator-status class → exclusion logic fires.
     mock_html = """
     <html>
         <body>
-            <div class="service-status-banner">Service - Normal</div>
+            <a data-tab="tab-service" class="live-network-status__tab-link">
+                <span aria-label="normal service"></span>
+            </a>
+            <div id="tab-service"></div>
+            <div id="tab-interruption"></div>
             <div class="station-item">
-                <div class="item-img"><span class="out-service"></span></div>
+                <div class="item-img"><span class="disrupted"></span></div>
                 <span class="station-name">Panama</span>
             </div>
             <h6>3 min</h6>
@@ -140,3 +167,35 @@ async def test_map_based_detection(scraper):
         assert status is not None
         assert status.is_outage is True
         assert "Outage at stations: Panama" in status.monitored_status
+
+
+@pytest.mark.asyncio
+async def test_future_station_not_flagged(scraper):
+    # A station in the monitored range has out-of-service span (future/not-yet-open station).
+    # Global status is normal. This must NOT be flagged as an outage.
+    mock_html = """
+    <html>
+        <body>
+            <a data-tab="tab-service" class="live-network-status__tab-link">
+                <span aria-label="normal service"></span>
+            </a>
+            <div id="tab-service"></div>
+            <div id="tab-interruption"></div>
+            <div class="station-item">
+                <div class="item-img"><span class="out-of-service"></span></div>
+                <span class="station-name disabled">Île-des-Sœurs</span>
+            </div>
+            <h6>3 min</h6>
+            <h6>7 min</h6>
+        </body>
+    </html>
+    """
+
+    with patch("httpx.AsyncClient.get") as mock_get:
+        mock_get.return_value = AsyncMock(status_code=200, text=mock_html)
+        mock_get.return_value.raise_for_status = lambda: None
+
+        status = await scraper.fetch_status()
+
+        assert status is not None
+        assert status.is_outage is False

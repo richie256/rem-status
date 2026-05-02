@@ -22,7 +22,11 @@ async def test_fetch_status_mock(scraper):
     mock_html = """
     <html>
         <body>
-            <div class="service-status-banner">Normal</div>
+            <a data-tab="tab-service" class="live-network-status__tab-link">
+                <span aria-label="normal service"></span>
+            </a>
+            <div id="tab-service"></div>
+            <div id="tab-interruption"></div>
             <h6>3 min 30 s</h6>
             <h6>7 min</h6>
         </body>
@@ -53,6 +57,11 @@ async def test_holiday_detection(scraper):
         mock_html = """
         <html>
             <body>
+                <a data-tab="tab-service" class="live-network-status__tab-link">
+                    <span aria-label="normal service"></span>
+                </a>
+                <div id="tab-service"></div>
+                <div id="tab-interruption"></div>
                 <div class="block">
                     <h2>Jours fériés</h2>
                     <p>Le service sera hors pointe les jours suivants : 13 avril, 1er mai.</p>

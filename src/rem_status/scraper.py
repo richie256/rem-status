@@ -95,6 +95,10 @@ class RemScraper:
 
             alert = self._parse_alert(status_soup)
 
+            planned = self._parse_planned_interruption(status_soup)
+            if planned:
+                logger.debug(f"Planned interruption (not affecting outage status): {planned}")
+
             is_outage, monitored_status = self._check_outage(status, alert, status_soup)
 
             return RemStatus(
@@ -151,12 +155,13 @@ class RemScraper:
             name = name_el.get_text(strip=True).lower()
 
             if name in monitored_range_lower:
-                # Check for "out-service" or missing "in-service"
                 status_span = item.select_one(".item-img span")
                 if status_span:
                     classes = status_span.get("class", [])
-                    # If it has 'out-service' or doesn't have 'in-service' (and it's not 'elevator-status')
-                    if "out-service" in classes or ("in-service" not in classes and "elevator-status" not in classes):
+                    is_future = "out-of-service" in classes
+                    is_ok = "in-service" in classes
+                    is_elevator = "elevator-status" in classes
+                    if not is_future and not is_ok and not is_elevator:
                         out_stations.append(name_el.get_text(strip=True))
 
         if out_stations:
@@ -241,17 +246,14 @@ class RemScraper:
         return False
 
     def _parse_status(self, soup: BeautifulSoup) -> str:
-        # Based on search results, look for service-status-banner or similar
-        status_banner = soup.select_one(".service-status-banner")
-        if status_banner:
-            return status_banner.get_text(strip=True)
-
-        # Fallback to general status block if exists
-        status_block = soup.select_one(".block-rem-service-status")
-        if status_block:
-            return status_block.get_text(strip=True)
-
-        return "Normal" if self.settings.language == "fr" else "Normal"
+        span = soup.select_one('a[data-tab="tab-service"] span[aria-label]')
+        if span:
+            raw = span["aria-label"].strip().lower()
+            if raw.endswith(" service"):
+                raw = raw[: -len(" service")].strip()
+            return raw.title()
+        logger.warning("Could not find service tab status span; defaulting to Unknown")
+        return "Unknown"
 
     def _parse_frequencies(self, soup: BeautifulSoup) -> tuple[Optional[str], Optional[str]]:
         peak = None
@@ -276,7 +278,11 @@ class RemScraper:
         return peak, off_peak
 
     def _parse_alert(self, soup: BeautifulSoup) -> Optional[str]:
-        # Collect all potential alert messages
+        service_tab = soup.select_one("#tab-service")
+        if not service_tab:
+            logger.warning("Could not find #tab-service in page HTML")
+            return None
+
         alert_selectors = [
             ".live-network-status__alert-content",
             ".live-network-status__trip-details-text",
@@ -287,17 +293,22 @@ class RemScraper:
 
         found_texts = []
         for selector in alert_selectors:
-            elements = soup.select(selector)
-            for el in elements:
+            for el in service_tab.select(selector):
                 text = el.get_text(strip=True)
                 if text and text not in found_texts:
-                    # Filter out generic "normal" messages
                     if not any(kw in text.lower() for kw in ["service normal", "service - normal"]):
                         found_texts.append(text)
 
-        if found_texts:
-            return " | ".join(found_texts)
+        return " | ".join(found_texts) if found_texts else None
 
+    def _parse_planned_interruption(self, soup: BeautifulSoup) -> Optional[str]:
+        interruption_tab = soup.select_one("#tab-interruption")
+        if not interruption_tab:
+            return None
+        el = interruption_tab.select_one(".live-network-status__alert-content")
+        if el:
+            text = el.get_text(strip=True)
+            return text if text else None
         return None
 
     async def close(self):
