@@ -94,7 +94,7 @@ class RemScraper:
 
             alert = self._parse_alert(status_soup)
 
-            is_outage, monitored_status = self._check_outage(status, alert)
+            is_outage, monitored_status = self._check_outage(status, alert, status_soup)
 
             return RemStatus(
                 status=status,
@@ -111,22 +111,19 @@ class RemScraper:
             logger.error(f"Error fetching REM status: {e}")
             return None
 
-    def _check_outage(self, status: str, alert: Optional[str]) -> tuple[bool, str]:
+    def _check_outage(self, status: str, alert: Optional[str], soup: BeautifulSoup) -> tuple[bool, str]:
         # Normal status strings
-        normal_strings = ["normal", "service normal", "normal - service"]
+        normal_strings = ["normal", "service normal", "normal - service", "service - normal"]
 
         is_global_normal = status.lower() in normal_strings and (not alert or alert.lower() in normal_strings)
-
-        if is_global_normal:
-            return False, "Normal"
 
         # If we have an issue, check if it's in the monitored range
         from_st = self.settings.monitor_station_from
         to_st = self.settings.monitor_station_to
 
         if not from_st or not to_st:
-            # Report any outage
-            return True, alert or status
+            # Report any outage if not specifically monitoring a range
+            return not is_global_normal, alert or status
 
         # Determine stations in range
         try:
@@ -141,9 +138,30 @@ class RemScraper:
         except ValueError:
             # If stations not found, fallback to reporting any outage but log it
             logger.warning(f"Station {from_st} or {to_st} not found in station list.")
-            return True, alert or status
+            return not is_global_normal, alert or status
 
-        # Check if alert or status mentions any station in range
+        # 1. Check the map status indicators (most reliable for specific stations)
+        station_items = soup.select(".station-item")
+        out_stations = []
+        for item in station_items:
+            name_el = item.select_one(".station-name")
+            if not name_el:
+                continue
+            name = name_el.get_text(strip=True).lower()
+            
+            if name in monitored_range_lower:
+                # Check for "out-service" or missing "in-service"
+                status_span = item.select_one(".item-img span")
+                if status_span:
+                    classes = status_span.get("class", [])
+                    # If it has 'out-service' or doesn't have 'in-service' (and it's not 'elevator-status')
+                    if "out-service" in classes or ("in-service" not in classes and "elevator-status" not in classes):
+                        out_stations.append(name_el.get_text(strip=True))
+
+        if out_stations:
+            return True, f"Outage at stations: {', '.join(out_stations)}"
+
+        # 2. Check if alert or status mentions any station in range (fallback/text alerts)
         full_text = f"{status} {alert or ''}".lower()
 
         # If the alert mentions "all stations" or "network wide"
@@ -163,7 +181,10 @@ class RemScraper:
                 return True, alert or status
 
         # If it's an outage but not in our range
-        return False, "Normal (Outage elsewhere)"
+        if not is_global_normal:
+            return False, "Normal (Outage elsewhere)"
+            
+        return False, "Normal"
 
     def _is_today_holiday(self, soup: BeautifulSoup) -> bool:
         now = datetime.now()
@@ -254,13 +275,28 @@ class RemScraper:
         return peak, off_peak
 
     def _parse_alert(self, soup: BeautifulSoup) -> Optional[str]:
-        alert_block = soup.select_one(".alert-message, .status-alert, .status-indicator")
-        if alert_block:
-            text = alert_block.get_text(strip=True)
-            # If it's just "Normal", it's not really an alert we want to highlight separately
-            if text.lower() in ["normal", "service normal"]:
-                return None
-            return text
+        # Collect all potential alert messages
+        alert_selectors = [
+            ".live-network-status__alert-content",
+            ".live-network-status__trip-details-text",
+            ".alert-message",
+            ".status-alert",
+            ".status-indicator",
+        ]
+        
+        found_texts = []
+        for selector in alert_selectors:
+            elements = soup.select(selector)
+            for el in elements:
+                text = el.get_text(strip=True)
+                if text and text not in found_texts:
+                    # Filter out generic "normal" messages
+                    if not any(kw in text.lower() for kw in ["service normal", "service - normal"]):
+                        found_texts.append(text)
+
+        if found_texts:
+            return " | ".join(found_texts)
+
         return None
 
     async def close(self):

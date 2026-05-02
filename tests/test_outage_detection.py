@@ -110,3 +110,32 @@ async def test_no_stations_specified():
         assert status is not None
         assert status.is_outage is True
         assert "Interruption at Brossard" in status.monitored_status
+
+@pytest.mark.asyncio
+async def test_map_based_detection(settings):
+    scraper = RemScraper(settings)
+    
+    # Panama is in range. Simulate it being out-service on the map.
+    mock_html = """
+    <html>
+        <body>
+            <div class="service-status-banner">Service - Normal</div>
+            <div class="station-item">
+                <div class="item-img"><span class="out-service"></span></div>
+                <span class="station-name">Panama</span>
+            </div>
+            <h6>3 min</h6>
+            <h6>7 min</h6>
+        </body>
+    </html>
+    """
+    
+    with patch("httpx.AsyncClient.get") as mock_get:
+        mock_get.return_value = AsyncMock(status_code=200, text=mock_html)
+        mock_get.return_value.raise_for_status = lambda: None
+        
+        status = await scraper.fetch_status()
+        
+        assert status is not None
+        assert status.is_outage is True
+        assert "Outage at stations: Panama" in status.monitored_status
