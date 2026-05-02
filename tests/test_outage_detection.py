@@ -3,18 +3,16 @@ from unittest.mock import AsyncMock, patch
 from rem_status.config import Settings
 from rem_status.scraper import RemScraper
 
+
 @pytest.fixture
 def settings():
-    return Settings(
-        language="en",
-        monitor_station_from="Panama",
-        monitor_station_to="Gare Centrale"
-    )
+    return Settings(language="en", monitor_station_from="Panama", monitor_station_to="Gare Centrale")
+
 
 @pytest.mark.asyncio
 async def test_outage_within_range(settings):
     scraper = RemScraper(settings)
-    
+
     mock_html = """
     <html>
         <body>
@@ -25,21 +23,22 @@ async def test_outage_within_range(settings):
         </body>
     </html>
     """
-    
+
     with patch("httpx.AsyncClient.get") as mock_get:
         mock_get.return_value = AsyncMock(status_code=200, text=mock_html)
         mock_get.return_value.raise_for_status = lambda: None
-        
+
         status = await scraper.fetch_status()
-        
+
         assert status is not None
         assert status.is_outage is True
         assert "Île-des-Sœurs" in status.monitored_status
 
+
 @pytest.mark.asyncio
 async def test_outage_outside_range(settings):
     scraper = RemScraper(settings)
-    
+
     # Range is Panama to Gare Centrale. Outage is at Brossard (outside range).
     mock_html = """
     <html>
@@ -51,21 +50,22 @@ async def test_outage_outside_range(settings):
         </body>
     </html>
     """
-    
+
     with patch("httpx.AsyncClient.get") as mock_get:
         mock_get.return_value = AsyncMock(status_code=200, text=mock_html)
         mock_get.return_value.raise_for_status = lambda: None
-        
+
         status = await scraper.fetch_status()
-        
+
         assert status is not None
         assert status.is_outage is False
         assert status.monitored_status == "Normal (Outage elsewhere)"
 
+
 @pytest.mark.asyncio
 async def test_network_wide_outage(settings):
     scraper = RemScraper(settings)
-    
+
     mock_html = """
     <html>
         <body>
@@ -75,22 +75,23 @@ async def test_network_wide_outage(settings):
         </body>
     </html>
     """
-    
+
     with patch("httpx.AsyncClient.get") as mock_get:
         mock_get.return_value = AsyncMock(status_code=200, text=mock_html)
         mock_get.return_value.raise_for_status = lambda: None
-        
+
         status = await scraper.fetch_status()
-        
+
         assert status is not None
         assert status.is_outage is True
         assert "Network wide" in status.monitored_status
+
 
 @pytest.mark.asyncio
 async def test_no_stations_specified():
     settings = Settings(monitor_station_from=None, monitor_station_to=None)
     scraper = RemScraper(settings)
-    
+
     mock_html = """
     <html>
         <body>
@@ -100,21 +101,22 @@ async def test_no_stations_specified():
         </body>
     </html>
     """
-    
+
     with patch("httpx.AsyncClient.get") as mock_get:
         mock_get.return_value = AsyncMock(status_code=200, text=mock_html)
         mock_get.return_value.raise_for_status = lambda: None
-        
+
         status = await scraper.fetch_status()
-        
+
         assert status is not None
         assert status.is_outage is True
         assert "Interruption at Brossard" in status.monitored_status
 
+
 @pytest.mark.asyncio
 async def test_map_based_detection(settings):
     scraper = RemScraper(settings)
-    
+
     # Panama is in range. Simulate it being out-service on the map.
     mock_html = """
     <html>
@@ -129,13 +131,13 @@ async def test_map_based_detection(settings):
         </body>
     </html>
     """
-    
+
     with patch("httpx.AsyncClient.get") as mock_get:
         mock_get.return_value = AsyncMock(status_code=200, text=mock_html)
         mock_get.return_value.raise_for_status = lambda: None
-        
+
         status = await scraper.fetch_status()
-        
+
         assert status is not None
         assert status.is_outage is True
         assert "Outage at stations: Panama" in status.monitored_status

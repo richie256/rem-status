@@ -148,7 +148,7 @@ class RemScraper:
             if not name_el:
                 continue
             name = name_el.get_text(strip=True).lower()
-            
+
             if name in monitored_range_lower:
                 # Check for "out-service" or missing "in-service"
                 status_span = item.select_one(".item-img span")
@@ -183,7 +183,7 @@ class RemScraper:
         # If it's an outage but not in our range
         if not is_global_normal:
             return False, "Normal (Outage elsewhere)"
-            
+
         return False, "Normal"
 
     def _is_today_holiday(self, soup: BeautifulSoup) -> bool:
@@ -283,7 +283,7 @@ class RemScraper:
             ".status-alert",
             ".status-indicator",
         ]
-        
+
         found_texts = []
         for selector in alert_selectors:
             elements = soup.select(selector)
