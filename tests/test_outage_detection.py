@@ -9,10 +9,13 @@ def settings():
     return Settings(language="en", monitor_station_from="Panama", monitor_station_to="Gare Centrale")
 
 
-@pytest.mark.asyncio
-async def test_outage_within_range(settings):
-    scraper = RemScraper(settings)
+@pytest.fixture
+def scraper(settings, tmp_path):
+    cache_file = tmp_path / "test_cache_outage.json"
+    return RemScraper(settings, cache_file=str(cache_file))
 
+@pytest.mark.asyncio
+async def test_outage_within_range(scraper):
     mock_html = """
     <html>
         <body>
@@ -34,11 +37,8 @@ async def test_outage_within_range(settings):
         assert status.is_outage is True
         assert "Île-des-Sœurs" in status.monitored_status
 
-
 @pytest.mark.asyncio
-async def test_outage_outside_range(settings):
-    scraper = RemScraper(settings)
-
+async def test_outage_outside_range(scraper):
     # Range is Panama to Gare Centrale. Outage is at Brossard (outside range).
     mock_html = """
     <html>
@@ -61,11 +61,8 @@ async def test_outage_outside_range(settings):
         assert status.is_outage is False
         assert status.monitored_status == "Normal (Outage elsewhere)"
 
-
 @pytest.mark.asyncio
-async def test_network_wide_outage(settings):
-    scraper = RemScraper(settings)
-
+async def test_network_wide_outage(scraper):
     mock_html = """
     <html>
         <body>
@@ -86,11 +83,11 @@ async def test_network_wide_outage(settings):
         assert status.is_outage is True
         assert "Network wide" in status.monitored_status
 
-
 @pytest.mark.asyncio
-async def test_no_stations_specified():
+async def test_no_stations_specified(tmp_path):
     settings = Settings(monitor_station_from=None, monitor_station_to=None)
-    scraper = RemScraper(settings)
+    cache_file = tmp_path / "test_cache_no_stations.json"
+    scraper = RemScraper(settings, cache_file=str(cache_file))
 
     mock_html = """
     <html>
@@ -112,11 +109,8 @@ async def test_no_stations_specified():
         assert status.is_outage is True
         assert "Interruption at Brossard" in status.monitored_status
 
-
 @pytest.mark.asyncio
-async def test_map_based_detection(settings):
-    scraper = RemScraper(settings)
-
+async def test_map_based_detection(scraper):
     # Panama is in range. Simulate it being out-service on the map.
     mock_html = """
     <html>
@@ -141,3 +135,4 @@ async def test_map_based_detection(settings):
         assert status is not None
         assert status.is_outage is True
         assert "Outage at stations: Panama" in status.monitored_status
+

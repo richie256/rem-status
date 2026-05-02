@@ -11,10 +11,14 @@ def settings():
     return Settings(language="fr")
 
 
-@pytest.mark.asyncio
-async def test_fetch_status_mock(settings):
-    scraper = RemScraper(settings)
+@pytest.fixture
+def scraper(settings, tmp_path):
+    cache_file = tmp_path / "test_cache.json"
+    return RemScraper(settings, cache_file=str(cache_file))
 
+
+@pytest.mark.asyncio
+async def test_fetch_status_mock(scraper):
     mock_html = """
     <html>
         <body>
@@ -38,10 +42,8 @@ async def test_fetch_status_mock(settings):
 
 
 @pytest.mark.asyncio
-async def test_holiday_detection(settings):
+async def test_holiday_detection(scraper):
     from datetime import datetime
-
-    scraper = RemScraper(settings)
 
     # Mock date to April 13
     with patch("rem_status.scraper.datetime") as mock_datetime:

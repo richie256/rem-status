@@ -38,14 +38,15 @@ STATIONS = [
 
 
 class RemScraper:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, cache_file: str = CACHE_FILE):
         self.settings = settings
+        self.cache_file = cache_file
         self.client = httpx.AsyncClient(timeout=10.0)
 
     def _get_cache(self) -> dict:
-        if os.path.exists(CACHE_FILE):
+        if os.path.exists(self.cache_file):
             try:
-                with open(CACHE_FILE, "r") as f:
+                with open(self.cache_file, "r") as f:
                     return json.load(f)
             except Exception as e:
                 logger.error(f"Error reading cache: {e}")
@@ -53,7 +54,7 @@ class RemScraper:
 
     def _save_cache(self, cache: dict):
         try:
-            with open(CACHE_FILE, "w") as f:
+            with open(self.cache_file, "w") as f:
                 json.dump(cache, f)
         except Exception as e:
             logger.error(f"Error saving cache: {e}")
