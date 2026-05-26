@@ -62,7 +62,7 @@ class MqttClient:
         }
 
         sensors = [
-            {"name": "Status", "id": "status", "icon": "mdi:train"},
+            {"name": "Status", "id": "status", "icon": "mdi:train", "with_attributes": True},
             {"name": "Frequency Peak", "id": "frequency_peak", "icon": "mdi:clock-fast"},
             {"name": "Frequency Off-Peak", "id": "frequency_off_peak", "icon": "mdi:clock-slow"},
             {"name": "Alert", "id": "alert", "icon": "mdi:alert-circle"},
@@ -79,6 +79,10 @@ class MqttClient:
                 "device": device,
                 "icon": sensor["icon"],
             }
+            if sensor.get("with_attributes"):
+                # Expose the full JSON payload as attributes so long fields like
+                # "alert" are not truncated by HA's 255-char state limit.
+                payload["json_attributes_topic"] = f"{base_topic}/state"
             self.client.publish(discovery_topic, json.dumps(payload), retain=True)
             logger.debug(f"Published discovery for {sensor['name']}")
 
