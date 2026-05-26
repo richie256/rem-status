@@ -45,6 +45,7 @@ BROSSARD_PANAMA_INTERRUPTION_311 = (
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def settings():
     return Settings(
@@ -78,6 +79,7 @@ def _published_payloads(mqtt_client) -> dict[str, dict]:
 # ---------------------------------------------------------------------------
 # _publish_discovery
 # ---------------------------------------------------------------------------
+
 
 class TestPublishDiscovery:
     def test_status_sensor_has_json_attributes_topic(self, mqtt_client):
@@ -134,6 +136,7 @@ class TestPublishDiscovery:
 # ---------------------------------------------------------------------------
 # publish_state — May 26 incident scenarios
 # ---------------------------------------------------------------------------
+
 
 class TestPublishState:
     def test_long_alert_published_in_full(self, mqtt_client):
