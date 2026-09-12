@@ -1,5 +1,5 @@
 import json
-from typing import Callable, Optional
+from collections.abc import Callable
 
 import paho.mqtt.client as mqtt
 from loguru import logger
@@ -11,7 +11,7 @@ from .models import RemStatus
 class MqttClient:
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.on_refresh_requested: Optional[Callable[[], None]] = None
+        self.on_refresh_requested: Callable[[], None] | None = None
         self.availability_topic = f"{settings.mqtt_base_topic}/availability"
         self.client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
         if settings.mqtt_username and settings.mqtt_password:

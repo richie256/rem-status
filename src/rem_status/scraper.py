@@ -3,7 +3,6 @@ import os
 import re
 import time
 from datetime import datetime
-from typing import Optional
 
 import httpx
 from bs4 import BeautifulSoup
@@ -57,7 +56,7 @@ class RemScraper:
     def _get_cache(self) -> dict:
         if os.path.exists(self.cache_file):
             try:
-                with open(self.cache_file, "r") as f:
+                with open(self.cache_file) as f:
                     return json.load(f)
             except Exception as e:
                 logger.error(f"Error reading cache: {e}")
@@ -70,7 +69,7 @@ class RemScraper:
         except Exception as e:
             logger.error(f"Error saving cache: {e}")
 
-    async def fetch_status(self) -> Optional[RemStatus]:
+    async def fetch_status(self) -> RemStatus | None:
         try:
             # 1. Fetch status (always needed for alerts/status)
             status_resp = await self.client.get(self.settings.status_url)
@@ -129,7 +128,7 @@ class RemScraper:
             logger.error(f"Error fetching REM status: {e}")
             return None
 
-    def _check_outage(self, status: str, alert: Optional[str], soup: BeautifulSoup) -> tuple[bool, str]:
+    def _check_outage(self, status: str, alert: str | None, soup: BeautifulSoup) -> tuple[bool, str]:
         # Normal status strings
         normal_strings = ["normal", "service normal", "normal - service", "service - normal"]
 
@@ -268,7 +267,7 @@ class RemScraper:
         logger.warning("Could not find service tab status span; defaulting to Unknown")
         return "Unknown"
 
-    def _parse_frequencies(self, soup: BeautifulSoup) -> tuple[Optional[str], Optional[str]]:
+    def _parse_frequencies(self, soup: BeautifulSoup) -> tuple[str | None, str | None]:
         frequencies: list[str] = []
 
         # 1. Primary selector: span.body-style--l-body (current rem.info layout)
@@ -292,7 +291,7 @@ class RemScraper:
 
         return peak, off_peak
 
-    def _parse_alert(self, soup: BeautifulSoup) -> Optional[str]:
+    def _parse_alert(self, soup: BeautifulSoup) -> str | None:
         service_tab = soup.select_one("#tab-service")
         if not service_tab:
             logger.warning("Could not find #tab-service in page HTML")
@@ -316,7 +315,7 @@ class RemScraper:
 
         return " | ".join(found_texts) if found_texts else None
 
-    def _parse_planned_interruption(self, soup: BeautifulSoup) -> Optional[str]:
+    def _parse_planned_interruption(self, soup: BeautifulSoup) -> str | None:
         interruption_tab = soup.select_one("#tab-interruption")
         if not interruption_tab:
             return None

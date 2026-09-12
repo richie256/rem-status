@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,8 +6,8 @@ class Settings(BaseSettings):
 
     mqtt_host: str = "localhost"
     mqtt_port: int = 1883
-    mqtt_username: Optional[str] = None
-    mqtt_password: Optional[str] = None
+    mqtt_username: str | None = None
+    mqtt_password: str | None = None
     mqtt_discovery_prefix: str = "homeassistant"
     mqtt_base_topic: str = "home/transit/rem"
 
@@ -19,8 +17,8 @@ class Settings(BaseSettings):
     poll_interval_off_peak: int = 300  # 5 minutes
     retry_interval: int = 30  # 30 seconds on fetch error
 
-    monitor_station_from: Optional[str] = None
-    monitor_station_to: Optional[str] = None
+    monitor_station_from: str | None = None
+    monitor_station_to: str | None = None
 
     # Peak hours: 6:30-9:30 and 15:30-18:30 (typical REM peak)
     peak_morning_start: str = "06:30"
