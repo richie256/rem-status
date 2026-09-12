@@ -12,10 +12,12 @@ class MqttClient:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.on_refresh_requested: Optional[Callable[[], None]] = None
+        self.availability_topic = f"{settings.mqtt_base_topic}/availability"
         self.client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
         if settings.mqtt_username and settings.mqtt_password:
             self.client.username_pw_set(settings.mqtt_username, settings.mqtt_password)
 
+        self.client.will_set(self.availability_topic, payload="offline", qos=1, retain=True)
         self.client.on_connect = self._on_connect
         self.client.on_disconnect = self._on_disconnect
         self.client.on_message = self._on_message
@@ -23,6 +25,7 @@ class MqttClient:
     def _on_connect(self, client, userdata, flags, rc, properties=None):
         if rc == 0:
             logger.info("Connected to MQTT broker")
+            self.client.publish(self.availability_topic, payload="online", qos=1, retain=True)
             self._publish_discovery()
 
             # Subscribe to Home Assistant status for birth messages
@@ -74,6 +77,7 @@ class MqttClient:
             payload = {
                 "name": f"REM {sensor['name']}",
                 "state_topic": f"{base_topic}/state",
+                "availability_topic": self.availability_topic,
                 "value_template": f"{{{{ value_json.{sensor['id']} }}}}",
                 "unique_id": f"rem_{sensor['id']}",
                 "device": device,
@@ -95,6 +99,7 @@ class MqttClient:
             payload = {
                 "name": f"REM {sensor['name']}",
                 "state_topic": f"{base_topic}/state",
+                "availability_topic": self.availability_topic,
                 "value_template": f"{{{{ 'ON' if value_json.{sensor['id']} else 'OFF' }}}}",
                 "unique_id": f"rem_{sensor['id']}",
                 "device": device,
@@ -107,9 +112,13 @@ class MqttClient:
     def publish_state(self, status: RemStatus):
         topic = f"{self.settings.mqtt_base_topic}/state"
         payload = status.model_dump_json()
-        self.client.publish(topic, payload)
+        self.client.publish(topic, payload, retain=True)
         logger.info(f"Published state: {payload}")
 
     def disconnect(self):
+        try:
+            self.client.publish(self.availability_topic, payload="offline", qos=1, retain=True)
+        except Exception as e:
+            logger.warning(f"Failed to publish offline availability: {e}")
         self.client.loop_stop()
         self.client.disconnect()

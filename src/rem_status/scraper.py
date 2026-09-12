@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import time
 from datetime import datetime
 from typing import Optional
@@ -13,6 +14,16 @@ from .models import RemStatus
 
 CACHE_FILE = "rem_cache.json"
 CACHE_EXPIRY = 48 * 3600  # 48 hours for frequency
+
+DEFAULT_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "fr-CA,fr;q=0.9,en-CA;q=0.8,en;q=0.7",
+}
 
 STATIONS = [
     "Brossard",
@@ -41,7 +52,7 @@ class RemScraper:
     def __init__(self, settings: Settings, cache_file: str = CACHE_FILE):
         self.settings = settings
         self.cache_file = cache_file
-        self.client = httpx.AsyncClient(timeout=10.0)
+        self.client = httpx.AsyncClient(timeout=10.0, headers=DEFAULT_HEADERS, follow_redirects=True)
 
     def _get_cache(self) -> dict:
         if os.path.exists(self.cache_file):
@@ -73,15 +84,17 @@ class RemScraper:
             today_str = now.strftime("%Y-%m-%d")
 
             # 3. Handle frequency
-            if cache["frequency"] and (time.time() - cache["timestamp"] < CACHE_EXPIRY):
-                peak, off_peak = cache["frequency"]["peak"], cache["frequency"]["off_peak"]
+            freq_cache = cache.get("frequency")
+            if freq_cache and freq_cache.get("peak") and (time.time() - cache.get("timestamp", 0) < CACHE_EXPIRY):
+                peak, off_peak = freq_cache["peak"], freq_cache["off_peak"]
             else:
                 sched_resp = await self.client.get(self.settings.schedule_url)
                 sched_resp.raise_for_status()
                 sched_soup = BeautifulSoup(sched_resp.text, "html.parser")
                 peak, off_peak = self._parse_frequencies(sched_soup)
-                cache["timestamp"] = time.time()
-                cache["frequency"] = {"peak": peak, "off_peak": off_peak}
+                if peak or off_peak:
+                    cache["timestamp"] = time.time()
+                    cache["frequency"] = {"peak": peak, "off_peak": off_peak}
 
             # 4. Handle holiday
             if cache["holiday_date"] == today_str:
@@ -256,24 +269,26 @@ class RemScraper:
         return "Unknown"
 
     def _parse_frequencies(self, soup: BeautifulSoup) -> tuple[Optional[str], Optional[str]]:
-        peak = None
-        off_peak = None
+        frequencies: list[str] = []
 
-        # Look for frequency values
-        # The structure found is: <h6>Frequency value</h6>
-        # We need to adapt the logic to find these h6 values.
-        # Since the structure is quite simple, we can select all h6 and find the ones that match frequency patterns.
-        h6_elements = soup.select("h6")
-        logger.debug(f"Found {len(h6_elements)} h6 elements: {[h.get_text(strip=True) for h in h6_elements]}")
-        frequencies = []
-        for h6 in h6_elements:
-            text = h6.get_text(strip=True).lower()
-            if "min" in text:
-                frequencies.append(h6.get_text(strip=True))
+        # 1. Primary selector: span.body-style--l-body (current rem.info layout)
+        for span in soup.select("span.body-style--l-body"):
+            text = span.get_text(strip=True)
+            if re.search(r"\bmin", text, re.I) and text not in frequencies:
+                frequencies.append(text)
 
-        if len(frequencies) >= 2:
-            peak = frequencies[0]
-            off_peak = frequencies[1]
+        # 2. Fallback to h6 or other elements (legacy structure and test fixtures)
+        if len(frequencies) < 2:
+            for el in soup.select("h6, .frequency-value"):
+                text = el.get_text(strip=True)
+                if re.search(r"\bmin", text, re.I) and text not in frequencies:
+                    frequencies.append(text)
+                    if len(frequencies) >= 2:
+                        break
+
+        logger.debug(f"Parsed frequencies: {frequencies}")
+        peak = frequencies[0] if len(frequencies) >= 1 else None
+        off_peak = frequencies[1] if len(frequencies) >= 2 else None
 
         return peak, off_peak
 

@@ -33,33 +33,45 @@ async def main():
 
     try:
         while not stop_event.is_set():
-            logger.debug("Fetching current status...")
-            status = await scraper.fetch_status()
-            is_holiday = False
-            if status:
-                mqtt.publish_state(status)
-                is_holiday = status.is_holiday
-
-            interval = settings.get_poll_interval(is_holiday)
-            logger.debug(f"Sleeping for {interval} seconds...")
-
-            refresh_event.clear()
-
-            # Wait for poll interval, stop signal, or refresh request
-            wait_tasks = [
-                asyncio.create_task(stop_event.wait()),
-                asyncio.create_task(refresh_event.wait()),
-            ]
             try:
-                await asyncio.wait(
-                    wait_tasks,
-                    timeout=interval,
-                    return_when=asyncio.FIRST_COMPLETED,
-                )
-            finally:
-                for task in wait_tasks:
-                    if not task.done():
-                        task.cancel()
+                logger.debug("Fetching current status...")
+                status = await scraper.fetch_status()
+                is_holiday = False
+                if status:
+                    mqtt.publish_state(status)
+                    is_holiday = status.is_holiday
+                    interval = settings.get_poll_interval(is_holiday)
+                else:
+                    logger.warning(f"Status fetch failed, retrying in {settings.retry_interval} seconds...")
+                    interval = settings.retry_interval
+
+                logger.debug(f"Sleeping for {interval} seconds...")
+
+                refresh_event.clear()
+
+                # Wait for poll interval, stop signal, or refresh request
+                wait_tasks = [
+                    asyncio.create_task(stop_event.wait()),
+                    asyncio.create_task(refresh_event.wait()),
+                ]
+                try:
+                    await asyncio.wait(
+                        wait_tasks,
+                        timeout=interval,
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                finally:
+                    for task in wait_tasks:
+                        if not task.done():
+                            task.cancel()
+            except Exception as e:
+                logger.error(f"Error in scraper loop iteration: {e}")
+                wait_task = asyncio.create_task(stop_event.wait())
+                try:
+                    await asyncio.wait([wait_task], timeout=settings.retry_interval)
+                finally:
+                    if not wait_task.done():
+                        wait_task.cancel()
     except Exception as e:
         logger.error(f"Unexpected error in main loop: {e}")
     finally:

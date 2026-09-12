@@ -79,3 +79,90 @@ async def test_holiday_detection(scraper):
             assert status.is_holiday is True
 
     await scraper.close()
+
+
+@pytest.mark.asyncio
+async def test_frequency_parsing_new_layout(scraper):
+    mock_status_html = """
+    <html>
+        <body>
+            <a data-tab="tab-service" class="live-network-status__tab-link">
+                <span aria-label="normal service"></span>
+            </a>
+            <div id="tab-service"></div>
+            <div id="tab-interruption"></div>
+        </body>
+    </html>
+    """
+    mock_schedule_html = """
+    <html>
+        <body>
+            <h6>Deux-Montagnes</h6>
+            <span class="body-style--l-body">3 minutes 30</span>
+            <h6>Anse-à-l'Orme</h6>
+            <span class="body-style--l-body">7 minutes</span>
+            <span class="body-style--l-body">14 minutes</span>
+        </body>
+    </html>
+    """
+
+    async def mock_get(url, *args, **kwargs):
+        mock_resp = AsyncMock(status_code=200)
+        mock_resp.raise_for_status = lambda: None
+        if "horaire" in str(url) or "hours" in str(url):
+            mock_resp.text = mock_schedule_html
+        else:
+            mock_resp.text = mock_status_html
+        return mock_resp
+
+    with patch("httpx.AsyncClient.get", side_effect=mock_get):
+        status = await scraper.fetch_status()
+        assert status is not None
+        assert status.frequency_peak == "3 minutes 30"
+        assert status.frequency_off_peak == "7 minutes"
+
+    await scraper.close()
+
+
+def test_english_schedule_url():
+    settings_en = Settings(language="en")
+    assert settings_en.schedule_url == "https://rem.info/en/travelling/hours-of-service"
+    assert settings_en.status_url == "https://rem.info/en/travelling/network-status"
+
+
+@pytest.mark.asyncio
+async def test_frequency_cache_does_not_cache_none(scraper):
+    mock_status_html = """
+    <html>
+        <body>
+            <a data-tab="tab-service" class="live-network-status__tab-link">
+                <span aria-label="normal service"></span>
+            </a>
+            <div id="tab-service"></div>
+            <div id="tab-interruption"></div>
+        </body>
+    </html>
+    """
+    # Empty schedule html with no frequencies
+    mock_schedule_html = "<html><body><div>No frequencies here</div></body></html>"
+
+    async def mock_get(url, *args, **kwargs):
+        mock_resp = AsyncMock(status_code=200)
+        mock_resp.raise_for_status = lambda: None
+        if "horaire" in str(url):
+            mock_resp.text = mock_schedule_html
+        else:
+            mock_resp.text = mock_status_html
+        return mock_resp
+
+    with patch("httpx.AsyncClient.get", side_effect=mock_get):
+        status = await scraper.fetch_status()
+        assert status is not None
+        assert status.frequency_peak is None
+        assert status.frequency_off_peak is None
+
+        # Verify cache was not populated with None frequency
+        cache = scraper._get_cache()
+        assert cache["frequency"] is None
+
+    await scraper.close()

@@ -15,8 +15,9 @@ class Settings(BaseSettings):
 
     direction: str = "Entre Brossard et Bois-Franc"
     language: str = "fr"
-    poll_interval_peak: int = 600  # 10 minutes
-    poll_interval_off_peak: int = 1800  # 300 minutes (Wait, user said 30 mins) -> 1800s
+    poll_interval_peak: int = 120  # 2 minutes
+    poll_interval_off_peak: int = 300  # 5 minutes
+    retry_interval: int = 30  # 30 seconds on fetch error
 
     monitor_station_from: Optional[str] = None
     monitor_station_to: Optional[str] = None
@@ -58,5 +59,5 @@ class Settings(BaseSettings):
     @property
     def schedule_url(self) -> str:
         if self.language.lower() == "en":
-            return "https://rem.info/en/se-deplacer/horaire-de-service"
+            return "https://rem.info/en/travelling/hours-of-service"
         return "https://rem.info/fr/se-deplacer/horaire-de-service"
